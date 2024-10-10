@@ -74,14 +74,19 @@ class DeviceSelectionView extends React.Component<
         };
 
         setInterval(() => {
-            SerialPort.list().then((ports) => {
-                this.setState({
-                    portList: filterPorts(
-                        ports.map((port) => port.path),
-                        true,
-                    ),
+            SerialPort.list()
+                .then((ports) => {
+                    return this.setState({
+                        portList: filterPorts(
+                            ports.map((port) => port.path),
+                            true,
+                        ),
+                    });
+                })
+                .catch(() => {
+                    this.setState({ portList: [] });
+                    message.warning('Failed to list serial ports');
                 });
-            });
 
             listCanableDevices()
                 .then((canableDeviceList) =>
@@ -232,40 +237,6 @@ class DeviceSelectionView extends React.Component<
                     )}
                     {deviceInterface === DeviceInterface.CAN && (
                         <Form.Item
-                            name="usb_device"
-                            label={i18n.t('usb_device')}
-                            rules={[
-                                {
-                                    required: true,
-                                    message: i18n.t('usb_required'),
-                                },
-                            ]}
-                        >
-                            <Select
-                                onChange={(value: string) => {
-                                    this.setState({
-                                        devicePort: value,
-                                        connectionChecked: false,
-                                    });
-                                }}
-                                allowClear
-                                style={{ minWidth: '150px' }}
-                            >
-                                <Option value="demo">
-                                    {i18n.t('demo_device')}
-                                </Option>
-                                {besstDeviceList.map((item) => {
-                                    return (
-                                        <Option value={item} key={item}>
-                                            {item}
-                                        </Option>
-                                    );
-                                })}
-                            </Select>
-                        </Form.Item>
-                    )}
-                    {deviceInterface === DeviceInterface.CAN && (
-                        <Form.Item
                             name="converter_type"
                             label="CAN converter type"
                             rules={[
@@ -299,7 +270,7 @@ class DeviceSelectionView extends React.Component<
                         canConveterType === CanConverterType.BESST && (
                             <Form.Item
                                 name="usb_device"
-                                label="USB device"
+                                label={i18n.t('usb_device')}
                                 rules={[
                                     {
                                         required: true,
@@ -317,7 +288,9 @@ class DeviceSelectionView extends React.Component<
                                     allowClear
                                     style={{ minWidth: '150px' }}
                                 >
-                                    <Option value="demo">Demo</Option>
+                                    <Option value="demo">
+                                        {i18n.t('demo_device')}
+                                    </Option>
                                     {besstDeviceList.map((item) => {
                                         return (
                                             <Option
@@ -335,7 +308,7 @@ class DeviceSelectionView extends React.Component<
                         canConveterType === CanConverterType.Canable && (
                             <Form.Item
                                 name="usb_device"
-                                label="USB device"
+                                label={i18n.t('usb_device')}
                                 rules={[
                                     {
                                         required: true,
@@ -353,7 +326,9 @@ class DeviceSelectionView extends React.Component<
                                     allowClear
                                     style={{ minWidth: '150px' }}
                                 >
-                                    <Option value="demo">Demo</Option>
+                                    <Option value="demo">
+                                        {i18n.t('demo_device')}
+                                    </Option>
                                     {canableDeviceList.map((item) => {
                                         return (
                                             <Option value={item} key={item}>
