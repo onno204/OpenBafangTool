@@ -15,6 +15,9 @@ import {
     getCanableCommandTimeout,
 } from './canable-types';
 import { CanFrame } from '../can/can-types';
+import { CanablePort } from './canable-port';
+import { CANFrame } from './canable-frame';
+import { parseCanFrame } from '../high-level/bafang-can-utils';
 
 export async function listCanableDevices(): Promise<string[]> {
     return (await SerialPort.list())
@@ -30,6 +33,8 @@ class CanableDevice implements IGenericCanAdapter {
     private path: string;
 
     private device?: SerialPort<AutoDetectTypes>;
+
+    private CanablePort?: CanablePort;
 
     public readonly emitter: EventEmitter;
 
@@ -83,7 +88,14 @@ class CanableDevice implements IGenericCanAdapter {
         packet.promise?.resolve();
         try {
             // log.info('sent besst package:', packet.data);
-            this.device?.write(bytes);
+            console.log('Attempting to write:', bytes, packet);
+            // this.device?.write(bytes);
+            // this.CanablePort?.send({
+            //     id: 1,
+            //     extendedId: true,
+            //     dlc: 8,
+            //     data: [1, 2, 3, 4, 5, 6, 7, 8],
+            // });
         } catch (e) {
             console.log('write error:', e);
             // this.onDisconnect();
@@ -95,13 +107,19 @@ class CanableDevice implements IGenericCanAdapter {
     }
 
     private processReadedData(data: Uint8Array): void {
-        this.serialReadBuffer = [...this.serialReadBuffer, ...data];
-        if (this.serialReadBuffer.indexOf(0x0a) === -1) return;
-        let cmd = this.serialReadBuffer.splice(
-            0,
-            this.serialReadBuffer.indexOf(0x0a) + 1,
-        );
+        // console.log('Raw data:', data);
+
+        // this.serialReadBuffer = [...this.serialReadBuffer, ...data];
+
+        // // Wait for a full command to be received
+        // if (this.serialReadBuffer.indexOf(0x0a) === -1) return;
+        // let cmd = this.serialReadBuffer.splice(
+        //     0,
+        //     this.serialReadBuffer.indexOf(0x0a) + 1,
+        // );
+        let cmd = data;
         let cmdData = cmd.slice(1, cmd.length - 1).map((byte) => byte - 0x30);
+
         console.log('Raw cmd:', cmd);
         switch (cmd[0]) {
             case 0x20:
@@ -147,120 +165,48 @@ class CanableDevice implements IGenericCanAdapter {
         }
     }
 
-    // private processCanFrame(packet: ReadedCanFrame): void {
-    //     if (packet.targetDeviceCode === DeviceNetworkId.BESST) {
-    //         if (packet.canOperationCode === CanOperation.MULTIFRAME_START) {
-    //             this.lastMultiframeCanResponse[packet.sourceDeviceCode] =
-    //                 packet;
-    //             this.lastMultiframeCanResponse[packet.sourceDeviceCode].data =
-    //                 [];
-    //             this.packetQueue.unshift(
-    //                 buildBesstCanCommandPacket(
-    //                     this.lastMultiframeCanResponse[packet.sourceDeviceCode]
-    //                         .targetDeviceCode,
-    //                     this.lastMultiframeCanResponse[packet.sourceDeviceCode]
-    //                         .sourceDeviceCode,
-    //                     CanOperation.NORMAL_ACK,
-    //                     this.lastMultiframeCanResponse[packet.sourceDeviceCode]
-    //                         .canCommandCode,
-    //                     this.lastMultiframeCanResponse[packet.sourceDeviceCode]
-    //                         .canCommandSubCode,
-    //                 ),
-    //             );
-    //         } else if (packet.canOperationCode === CanOperation.MULTIFRAME) {
-    //             if (this.lastMultiframeCanResponse[packet.sourceDeviceCode]) {
-    //                 this.lastMultiframeCanResponse[
-    //                     packet.sourceDeviceCode
-    //                 ].data = [
-    //                     ...this.lastMultiframeCanResponse[
-    //                         packet.sourceDeviceCode
-    //                     ].data,
-    //                     ...packet.data,
-    //                 ];
-    //                 this.packetQueue.unshift(
-    //                     buildBesstCanCommandPacket(
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].targetDeviceCode,
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].sourceDeviceCode,
-    //                         CanOperation.NORMAL_ACK,
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].canCommandCode,
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].canCommandSubCode,
-    //                     ),
-    //                 );
-    //             }
-    //         } else if (
-    //             packet.canOperationCode === CanOperation.MULTIFRAME_END
-    //         ) {
-    //             if (this.lastMultiframeCanResponse[packet.sourceDeviceCode]) {
-    //                 this.lastMultiframeCanResponse[
-    //                     packet.sourceDeviceCode
-    //                 ].data = [
-    //                     ...this.lastMultiframeCanResponse[
-    //                         packet.sourceDeviceCode
-    //                     ].data,
-    //                     ...packet.data,
-    //                 ];
-    //                 this.emitter.emit(
-    //                     'can',
-    //                     this.lastMultiframeCanResponse[packet.sourceDeviceCode],
-    //                 );
-    //                 this.packetQueue.unshift(
-    //                     buildBesstCanCommandPacket(
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].targetDeviceCode,
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].sourceDeviceCode,
-    //                         CanOperation.NORMAL_ACK,
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].canCommandCode,
-    //                         this.lastMultiframeCanResponse[
-    //                             packet.sourceDeviceCode
-    //                         ].canCommandSubCode,
-    //                     ),
-    //                 );
-    //                 delete this.lastMultiframeCanResponse[
-    //                     packet.sourceDeviceCode
-    //                 ];
-    //             }
-    //         } else if (packet.canOperationCode === CanOperation.NORMAL_ACK) {
-    //             this.emitter.emit('can', packet);
-    //         }
-    //     } else if (packet.canOperationCode === CanOperation.WRITE_CMD) {
-    //         this.emitter.emit('can', packet);
-    //     } else {
-    //         console.log('unknown command', packet);
-    //     }
-    // }
-
     public async connect(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            this.device = new SerialPort({
-                path: this.path,
-                baudRate: 921600,
-                autoOpen: false,
-            });
-            this.device.on('readable', () =>
-                this.processReadedData(this.device?.read()),
-            );
-            this.device.on('open', () => {
+            console.log(this.path);
+            // To prevent multiple connections to the same COM port, we check if there is already a port connected in this class
+            if (this.CanablePort) {
+                console.log(
+                    'There is already a port connected, ignoring connect request',
+                );
+                resolve();
+                return;
+            }
+            this.CanablePort = new CanablePort(this.path);
+            this.CanablePort.open((error) => (error ? reject(error) : 0));
+            this.CanablePort.setBitRate(250000);
+            this.CanablePort.on('data', this.processFrame.bind(this));
+
+            this.CanablePort.on('open', () => {
                 this.packetQueue.push({
                     type: CanableCommands.OPEN,
                 });
                 resolve();
             });
-            this.device.open((error) => (error ? reject(error) : 0));
+
             setTimeout(this.processWriteQueue, 100);
         });
+    }
+
+    private processFrame(frame: CANFrame): void {
+        // Split the original hex id into 4 bytes
+        const hexFirstChar = frame.hexId[0];
+        const hexRemaining = frame.hexId.slice(1);
+        const frameId = [hexFirstChar, ...hexRemaining.match(/.{2}/g)].map(
+            (byte) => parseInt(byte, 16),
+        );
+
+        const canFrame: CanFrame = {
+            id: frameId,
+            data: frame.data,
+        };
+        this.emitter.emit('can', canFrame);
+        // const parsedCanFrame: ParsedCanFrame = parseCanFrame(canFrame);
+        // console.log('parsedCanFrame: ', parsedCanFrame);
     }
 
     public getVersion(): Promise<number[]> {
@@ -274,26 +220,26 @@ class CanableDevice implements IGenericCanAdapter {
 
     public testConnection(): Promise<boolean> {
         return new Promise<boolean>(async (resolve, reject) => {
-            if (!this.device) await this.connect();
-            this.getVersion()
-                .then((version) => {
-                    console.log(version);
-                    resolve(true);
-                })
-                .catch(reject);
+            // if (!this.CanablePort) await this.connect();
+            // this.getVersion()
+            //     .then((version) => {
+            //         console.log(version);
+            //         resolve(true);
+            //     })
+            //     .catch(reject);
             resolve(true);
         });
     }
 
     public sendCanFrame(frame: CanFrame): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            // console.log('Should write frame but blocked: ', frame);
-            // resolve();
-            this.packetQueue.push({
-                type: CanableCommands.FRAME,
-                frame,
-                promise: { resolve, reject },
-            });
+            console.log('Should write frame but blocked: ', frame);
+            resolve();
+            // this.packetQueue.push({
+            //     type: CanableCommands.FRAME,
+            //     frame,
+            //     promise: { resolve, reject },
+            // });
         });
     }
 
@@ -301,7 +247,10 @@ class CanableDevice implements IGenericCanAdapter {
         return new Promise<void>((resolve, reject) => {});
     }
 
-    public disconnect(): void {}
+    public disconnect(): void {
+        this.device?.close();
+        this.CanablePort?.close();
+    }
 }
 
 export default CanableDevice;

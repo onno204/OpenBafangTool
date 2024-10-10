@@ -107,27 +107,52 @@ export default class BafangCanSystem implements IConnection {
 
         return new Promise<boolean>(async (resolve) => {
             if (this._converterType === CanConverterType.BESST) {
-                let besst = this.device as BesstDevice;
-                besst.reset().then(() => {
-                    besst.emitter.removeAllListeners();
-                    this._controller?.connect();
-                    this._display?.connect();
-                    this._sensor?.connect();
-                    this._battery?.connect();
-                    this._besst?.connect();
-                    this.device?.emitter.on('can', (frame) => {
-                        this.can_emitter.emit('can', parseCanFrame(frame));
+                const besst = this.device as BesstDevice;
+                besst
+                    .reset()
+                    .then(() => {
+                        besst.emitter.removeAllListeners();
+                        this._controller?.connect();
+                        this._display?.connect();
+                        this._sensor?.connect();
+                        this._battery?.connect();
+                        this._besst?.connect();
+                        this.device?.emitter.on('can', (frame) => {
+                            this.can_emitter.emit('can', parseCanFrame(frame));
+                        });
+                        this.device?.emitter.on(
+                            'disconnection',
+                            this.onDisconnect,
+                        );
+                        besst.activateDriveUnit().then(() => {
+                            resolve(true);
+                        });
+                    })
+                    .catch(() => {
+                        resolve(false);
                     });
-                    this.device?.emitter.on('disconnection', this.onDisconnect);
-                    besst.activateDriveUnit().then(() => {
-                        resolve(true);
-                    });
-                });
             } else {
-                let canable = this.device as CanableDevice;
-                await canable.connect();
-                console.log(await canable.testConnection());
-                resolve(true);
+                const canable = this.device as CanableDevice;
+                await canable
+                    .connect()
+                    .then(() => {
+                        // this._controller?.connect();
+                        resolve(true);
+                        return true;
+                    })
+                    .catch((e: any) => {
+                        resolve(false);
+                        console.error('Error while connecting:', e);
+                        console.error(
+                            `[A application restart may fix this] ${e}`,
+                        );
+                        // eslint-disable-next-line no-alert
+                        // alert(`[A application restart may fix this] ${e}`);
+                    });
+                // await canable.testConnection().then((connected) => {
+                //     resolve(connected);
+                //     return connected;
+                // });
             }
         });
     }
@@ -144,10 +169,38 @@ export default class BafangCanSystem implements IConnection {
         if (this.devicePath === 'demo') {
             return new Promise<boolean>((resolve) => resolve(true));
         }
-        return new Promise<boolean>((resolve) => {
+        return new Promise<boolean>(async (resolve) => {
             try {
-                //TODO
-                resolve(true);
+                // TODO
+                if (this._converterType === CanConverterType.Canable) {
+                    this.connect()
+                        .then(async (connected) => {
+                            if (connected) {
+                                const canable = this.device as CanableDevice;
+                                await canable
+                                    .testConnection()
+                                    .then((testSucceeded) => {
+                                        this.disconnect();
+                                        if (!testSucceeded) {
+                                            this.disconnect();
+                                        }
+                                        resolve(connected);
+                                        return connected;
+                                    });
+                                // this.disconnect();
+                            } else {
+                                resolve(false);
+                            }
+                            return connected;
+                        })
+                        .catch((e) => {
+                            this.disconnect();
+                            console.error('Error while testing connection', e);
+                            resolve(false);
+                        });
+                } else {
+                    resolve(true);
+                }
             } catch (error) {
                 console.log(error);
                 resolve(false);
