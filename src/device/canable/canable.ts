@@ -18,7 +18,11 @@ import { CanFrame } from '../can/can-types';
 
 export async function listCanableDevices(): Promise<string[]> {
     return (await SerialPort.list())
-        .filter((port) => port.vendorId === 'ad50' && port.productId === '60c5')
+        .filter(
+            (port) =>
+                port.vendorId === 'AD50' &&
+                ['60C5', '60C4'].includes(port.productId ?? ''),
+        )
         .map((port) => port.path);
 }
 
@@ -283,6 +287,8 @@ class CanableDevice implements IGenericCanAdapter {
 
     public sendCanFrame(frame: CanFrame): Promise<void> {
         return new Promise<void>((resolve, reject) => {
+            // console.log('Should write frame but blocked: ', frame);
+            // resolve();
             this.packetQueue.push({
                 type: CanableCommands.FRAME,
                 frame,
