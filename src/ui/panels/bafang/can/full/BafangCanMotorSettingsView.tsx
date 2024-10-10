@@ -752,6 +752,73 @@ class BafangCanMotorSettingsView extends React.Component<
         ];
     }
 
+    getChangedParameters(): {
+        key: string;
+        newValue: string;
+        oldValue: string;
+    }[] {
+        const currentParameters = this.state.parameter1 as {
+            [key: string]: any;
+        };
+        const newParamters = this.state as { [key: string]: any };
+        if (!currentParameters) return [];
+        const changedParameters: {
+            key: string;
+            newValue: string;
+            oldValue: string;
+        }[] = [];
+
+        Object.keys(currentParameters).forEach((key) => {
+            let value = newParamters[key];
+
+            // Check assist level based on object
+            if (key === 'assist_levels' && value !== null) {
+                console.log(
+                    'New state',
+                    key,
+                    newParamters[key],
+                    currentParameters[key],
+                );
+                if (
+                    JSON.stringify(value) !==
+                    JSON.stringify(currentParameters[key])
+                ) {
+                    // Only show the old value since the new value is visually in a table
+                    changedParameters.push({
+                        key,
+                        newValue: '...',
+                        oldValue: JSON.stringify(value),
+                    });
+                }
+                return true;
+            }
+            if (
+                value !== null &&
+                value !== undefined &&
+                value !== currentParameters[key]
+            ) {
+                switch (typeof value) {
+                    case 'object':
+                        value = JSON.stringify(value);
+                        break;
+                    case 'boolean':
+                        value = value ? 'true' : 'false';
+                        break;
+                    default:
+                        value = value.toString();
+                }
+                changedParameters.push({
+                    key,
+                    newValue: value,
+                    oldValue: currentParameters[key].toString(),
+                });
+            }
+            return true;
+        });
+        console.log('changedParameters', changedParameters);
+        return changedParameters;
+    }
+
     saveParameters(): void {
         if (this.writingInProgress) return;
         this.writingInProgress = true;
@@ -796,7 +863,7 @@ class BafangCanMotorSettingsView extends React.Component<
                     this.state.throttle_max_voltage;
             if (this.state.assist_levels !== null)
                 parameter1.assist_levels = this.state.assist_levels;
-            connection.controller.parameter1 = parameter1; //TODO
+            connection.controller.parameter1 = parameter1; // TODO
         }
         if (this.state.torque_profiles) {
             connection.controller.parameter2 = {
@@ -1029,7 +1096,22 @@ class BafangCanMotorSettingsView extends React.Component<
                 />
                 <Popconfirm
                     title={i18n.t('parameter_writing_title')}
-                    description={i18n.t('parameter_writing_confirm')}
+                    description={
+                        <div>
+                            {i18n.t('parameter_writing_confirm')}
+                            <br />
+                            These parameters are changed will be written to the
+                            controller:
+                            <br />
+                            <ul>
+                                {this.getChangedParameters().map((item) => (
+                                    <li>
+                                        {`${item.key}: ${item.oldValue} -> ${item.newValue}`}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    }
                     onConfirm={this.saveParameters}
                     okText={i18n.t('yes')}
                     cancelText={i18n.t('no')}
