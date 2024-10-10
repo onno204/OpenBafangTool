@@ -55,6 +55,8 @@ class DeviceSelectionView extends React.Component<
     DeviceSelectionProps,
     DeviceSelectionState
 > {
+    private intervalId: number | null = null;
+
     constructor(props: DeviceSelectionProps) {
         super(props);
         this.state = {
@@ -72,8 +74,11 @@ class DeviceSelectionView extends React.Component<
             localLawsAgreement: false,
             disclaimerAgreement: false,
         };
+    }
 
-        setInterval(() => {
+    componentDidMount() {
+        this.intervalId = setInterval(() => {
+            console.log('searching for devices');
             SerialPort.list()
                 .then((ports) => {
                     return this.setState({
@@ -98,7 +103,13 @@ class DeviceSelectionView extends React.Component<
                 });
 
             this.setState({ besstDeviceList: listBesstDevices() });
-        }, 1000);
+        }, 1000) as unknown as number; // Double cast is needed because of the type mismatch (output is number and not NodeJS.Timeout)
+    }
+
+    componentWillUnmount() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+        }
     }
 
     render() {
