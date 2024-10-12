@@ -1,7 +1,7 @@
-// NOTE: Copied from https://github.com/embedify/canable/blob/master/can-port.js and converted to TypeScript
+// NOTE: Copied, converted to TypeScript and modified from https://github.com/embedify/canable/blob/master/can-port.js
 import { SerialPort } from 'serialport';
 import { EventEmitter } from 'events';
-import { CANFrame } from './canable-frame';
+import { CanableFrame } from './canable-frame';
 
 function stringForEach(data: string, callback) {
     for (let i = 0; i < data.length; i++) {
@@ -19,7 +19,8 @@ function printHexString(number, padding): string {
 }
 
 export class CanablePort extends EventEmitter {
-    public static currentActivePort: CanablePort? = null;
+    // eslint-disable-next-line no-use-before-define
+    public static currentActivePort: CanablePort | null = null;
 
     private serialPort: SerialPort;
 
@@ -72,8 +73,11 @@ export class CanablePort extends EventEmitter {
 
         // Open the serial port
         this.serialPort.open(cb);
+
+        // Events to be forwarded to the CanablePort emitter
         this.serialPort.on('data', handlerFactory(this));
         this.serialPort.on('open', () => this.emit('open'));
+        this.serialPort.on('disconnect', () => this.emit('disconnect'));
         this.serialPort.write('O\r', cb);
     }
 
@@ -87,7 +91,7 @@ export class CanablePort extends EventEmitter {
         });
     }
 
-    send(message) {
+    send(message: CanableFrame) {
         let stringyFrame = '';
 
         if (message.extendedId) {
@@ -104,8 +108,8 @@ export class CanablePort extends EventEmitter {
 
         stringyFrame += '\r';
 
-        console.log(stringyFrame);
-
+        // Sends canframe, eg T05116005100
+        // console.log('Sending canframe: ', stringyFrame, message);
         this.serialPort.write(stringyFrame);
     }
 
@@ -144,7 +148,10 @@ export class CanablePort extends EventEmitter {
     }
 
     // Private functions
-    processStringyFrame(stringyFrame: string): CANFrame | null {
+    /*
+        Porcess incoming canbus frame. Eg. T01F831004AB020089 / T04F83402100 / T01F831004AB0200B2
+    */
+    processStringyFrame(stringyFrame: string): CanableFrame | null {
         let idLength;
         let extended;
 
@@ -184,13 +191,6 @@ export class CanablePort extends EventEmitter {
                 ),
             );
         }
-
-        return new CANFrame({
-            hexId: id.toString(16),
-            id,
-            dlc,
-            extendedId: extended,
-            data,
-        });
+        return new CanableFrame(id, dlc, extended, data);
     }
 }

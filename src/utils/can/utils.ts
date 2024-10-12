@@ -42,27 +42,40 @@ export function readParameter(
     requestManager: RequestManager,
     promise?: PromiseControls,
 ): void {
-    device
-        .sendCanFrame({
-            id: generateCanFrameId(
-                DeviceNetworkId.BESST,
-                target,
-                CanOperation.READ_CMD,
-                can_command.canCommandCode,
-                can_command.canCommandSubCode,
-            ),
-            data: [0],
-        })
-        .then(() =>
-            requestManager.registerRequest(
-                DeviceNetworkId.BESST,
-                target,
-                CanOperation.READ_CMD,
-                can_command.canCommandCode,
-                can_command.canCommandSubCode,
-                promise,
-            ),
-        );
+    let timeoutTime = 0;
+    // Add a delay for the read command to prevent the controller from getting overwhelmed (these are multi-frame commands)
+    if (
+        can_command.canCommandCode === 0x60 &&
+        can_command.canCommandSubCode < 0x12
+    ) {
+        timeoutTime = 200 * (can_command.canCommandSubCode % 5);
+    }
+    setTimeout(() => {
+        device
+            .sendCanFrame({
+                id: generateCanFrameId(
+                    DeviceNetworkId.BESST,
+                    target,
+                    CanOperation.READ_CMD,
+                    can_command.canCommandCode,
+                    can_command.canCommandSubCode,
+                ),
+                data: [0],
+            })
+            .then(() =>
+                requestManager.registerRequest(
+                    DeviceNetworkId.BESST,
+                    target,
+                    CanOperation.READ_CMD,
+                    can_command.canCommandCode,
+                    can_command.canCommandSubCode,
+                    promise,
+                ),
+            )
+            .catch((e) => {
+                console.error('Error while sending read can frame', e);
+            });
+    }, timeoutTime);
 }
 
 export function writeShortParameter(
@@ -93,7 +106,10 @@ export function writeShortParameter(
                 can_command.canCommandSubCode,
                 promise,
             ),
-        );
+        )
+        .catch((e) => {
+            console.error('Error while sending write can frame', e);
+        });
 }
 
 export function writeLongParameter(

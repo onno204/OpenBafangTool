@@ -44,6 +44,10 @@ export class RequestManager {
                             .can_operation !== CanOperation.READ_CMD ||
                         attempt >= 3
                     ) {
+                        console.error(
+                            'Error while sending can frame after 3 attempts',
+                            { source, target, can_operation, code, subcode },
+                        );
                         promise.resolve(false);
                         return;
                     }
@@ -68,13 +72,17 @@ export class RequestManager {
                                 promise,
                                 ++attempt,
                             ),
-                        );
+                        )
+                        .catch((e) => {
+                            console.error('Error while sending can frame', e);
+                        });
                 }
             }, 5000);
         }
     }
 
     public resolveRequest(response: ParsedCanFrame, success = true): void {
+        // Check if the request is in the sentRequests array
         if (
             this.sentRequests[response.sourceDeviceCode] &&
             this.sentRequests[response.sourceDeviceCode][
@@ -84,6 +92,8 @@ export class RequestManager {
                 response.canCommandCode
             ][response.canCommandSubCode]
         ) {
+            // console.log('RequestManager.resolveRequest', response);
+            // Resolve the promise and delete the request
             this.sentRequests[response.sourceDeviceCode][
                 response.canCommandCode
             ][response.canCommandSubCode].promise.resolve(success);
